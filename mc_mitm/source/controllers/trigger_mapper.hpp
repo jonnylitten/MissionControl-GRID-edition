@@ -47,6 +47,13 @@ namespace ams::controller {
         return static_cast<u16>(t) * 0x101;
     }
 
+    // Specialised for 10-bit triggers (Xbox One — 0..0x3FF). Bit-replicate so the
+    // top 6 bits of t fill the bottom 6 bits of the u16, giving exact endpoints
+    // (t=0x3FF → 0xFFFF, t=0 → 0).
+    constexpr u16 NormalizeTriggerU10(u16 t) {
+        return static_cast<u16>((t << 6) | (t >> 4));
+    }
+
     class TriggerMapper {
         public:
             static TriggerMapper& Instance();

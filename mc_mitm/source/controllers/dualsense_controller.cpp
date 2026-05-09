@@ -14,6 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "dualsense_controller.hpp"
+#include "trigger_mapper.hpp"
 #include "../mcmitm_config.hpp"
 #include <stratosphere.hpp>
 
@@ -70,6 +71,7 @@ namespace ams::controller {
     }
 
     Result DualsenseController::Initialize() {
+        m_supports_trigger_map = true;
         R_TRY(this->PushRumbleLedState());
         R_TRY(EmulatedSwitchController::Initialize());
 
@@ -152,6 +154,9 @@ namespace ams::controller {
 
         m_buttons.ZR = src->input0x01.right_trigger > (m_trigger_threshold * TriggerMax);
         m_buttons.ZL = src->input0x01.left_trigger  > (m_trigger_threshold * TriggerMax);
+
+        m_left_trigger_raw  = NormalizeTriggerU8(src->input0x01.left_trigger);
+        m_right_trigger_raw = NormalizeTriggerU8(src->input0x01.right_trigger);
     }
 
     void DualsenseController::MapInputReport0x31(const DualsenseReportData *src) {
@@ -180,6 +185,9 @@ namespace ams::controller {
 
         m_buttons.ZR = src->input0x31.right_trigger > (m_trigger_threshold * TriggerMax);
         m_buttons.ZL = src->input0x31.left_trigger  > (m_trigger_threshold * TriggerMax);
+
+        m_left_trigger_raw  = NormalizeTriggerU8(src->input0x31.left_trigger);
+        m_right_trigger_raw = NormalizeTriggerU8(src->input0x31.right_trigger);
 
         if (src->input0x31.buttons.touchpad) {
             for (int i = 0; i < 2; ++i) {

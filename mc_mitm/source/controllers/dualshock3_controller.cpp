@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "dualshock3_controller.hpp"
+#include "trigger_mapper.hpp"
 #include "../bluetooth_mitm/bluetooth/bluetooth_core.hpp"
 #include "../mcmitm_config.hpp"
 #include <stratosphere.hpp>
@@ -185,6 +186,7 @@ namespace ams::controller {
     }
 
     Result Dualshock3Controller::Initialize() {
+        m_supports_trigger_map = true;
         R_TRY(EmulatedSwitchController::Initialize());
         R_TRY(this->SendEnablePayload());
 
@@ -261,6 +263,9 @@ namespace ams::controller {
         m_buttons.ZR = src->input0x01.right_trigger > (m_trigger_threshold * TriggerMax);
         m_buttons.L  = src->input0x01.buttons.L1;
         m_buttons.ZL = src->input0x01.left_trigger  > (m_trigger_threshold * TriggerMax);
+
+        m_left_trigger_raw  = NormalizeTriggerU8(src->input0x01.left_trigger);
+        m_right_trigger_raw = NormalizeTriggerU8(src->input0x01.right_trigger);
 
         m_buttons.minus = src->input0x01.buttons.select;
         m_buttons.plus  = src->input0x01.buttons.start;
