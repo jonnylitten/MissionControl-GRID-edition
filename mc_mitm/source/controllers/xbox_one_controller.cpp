@@ -14,6 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "xbox_one_controller.hpp"
+#include "trigger_mapper.hpp"
 #include <stratosphere.hpp>
 
 namespace ams::controller {
@@ -59,6 +60,9 @@ namespace ams::controller {
 
         m_buttons.ZR = src->input0x01.right_trigger > (m_trigger_threshold * TriggerMax);
         m_buttons.ZL = src->input0x01.left_trigger  > (m_trigger_threshold * TriggerMax);
+
+        m_left_trigger_raw  = NormalizeTriggerU10(src->input0x01.left_trigger);
+        m_right_trigger_raw = NormalizeTriggerU10(src->input0x01.right_trigger);
 
         if (new_format) {
             m_buttons.dpad_down  = (src->input0x01.buttons.dpad == XboxOneDPad_S)  ||
