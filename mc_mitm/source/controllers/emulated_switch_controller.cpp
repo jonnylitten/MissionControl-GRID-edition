@@ -73,7 +73,8 @@ namespace ams::controller {
         this->ProcessInputData(report);
 
         if (m_supports_trigger_map) {
-            TriggerMapper::Instance().Apply(m_buttons, m_left_stick, m_right_stick,
+            TriggerMapper::Instance().Apply(m_address,
+                                            m_buttons, m_left_stick, m_right_stick,
                                             m_left_trigger_raw, m_right_trigger_raw);
         }
 
