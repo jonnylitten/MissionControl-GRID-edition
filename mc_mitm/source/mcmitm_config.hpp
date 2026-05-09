@@ -40,10 +40,11 @@ namespace ams::mitm {
         } misc;
 
         struct {
-            int  mode;          // 0=off, 1=rstick_y_split
-            int  zr_threshold;  // 0..100
-            int  zl_threshold;  // 0..100
-            int  deadzone;      // 0..100
+            int  mode;                          // 0=off, 1=rstick_y_split
+            int  zr_threshold;                  // 0..100, >100 = off
+            int  zl_threshold;                  // 0..100, >100 = off
+            int  stick_y_to_buttons_threshold;  // 0..100, >100 = off
+            int  deadzone;                      // 0..100
             bool invert_y;
         } trigger_map;
     };

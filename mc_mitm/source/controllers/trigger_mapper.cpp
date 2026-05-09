@@ -70,6 +70,8 @@ namespace ams::controller {
                 parse_threshold_or_off(&p->zr_threshold);
             } else if (strcasecmp(name, "zl_threshold") == 0) {
                 parse_threshold_or_off(&p->zl_threshold);
+            } else if (strcasecmp(name, "stick_y_to_buttons_threshold") == 0) {
+                parse_threshold_or_off(&p->stick_y_to_buttons_threshold);
             } else if (strcasecmp(name, "deadzone") == 0) {
                 int tmp = std::strtol(value, nullptr, 10);
                 if (tmp >= 0 && tmp <= 100) {
@@ -217,14 +219,29 @@ namespace ams::controller {
 
         switch (p.mode) {
             case TriggerMode::RstickYSplit: {
+                // Capture the physical right-stick Y *before* the trigger-derived
+                // value overwrites it — the user can still meaningfully push the
+                // stick up/down, we just need to grab it now.
+                const u16 physical_y = rstick.GetY();
+
                 float deflection = rt - lt;
                 if (p.invert_y) {
                     deflection = -deflection;
                 }
                 rstick.SetY(DeflectionToY12Bit(deflection));
 
-                buttons.ZR = (rt * 100.0f) >= p.zr_threshold ? 1 : 0;
-                buttons.ZL = (lt * 100.0f) >= p.zl_threshold ? 1 : 0;
+                bool zr = (rt * 100.0f) >= p.zr_threshold;
+                bool zl = (lt * 100.0f) >= p.zl_threshold;
+
+                if (p.stick_y_to_buttons_threshold <= 100) {
+                    const float py_norm = (static_cast<int>(physical_y) - static_cast<int>(SwitchAnalogStick::Center))
+                                        / static_cast<float>(SwitchAnalogStick::Max - SwitchAnalogStick::Center);
+                    if ( py_norm * 100.0f >= p.stick_y_to_buttons_threshold) zr = true;
+                    if (-py_norm * 100.0f >= p.stick_y_to_buttons_threshold) zl = true;
+                }
+
+                buttons.ZR = zr ? 1 : 0;
+                buttons.ZL = zl ? 1 : 0;
                 break;
             }
             case TriggerMode::Off:

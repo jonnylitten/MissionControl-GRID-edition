@@ -41,11 +41,12 @@ namespace ams::mitm {
                 .dualsense_vibration_intensity = 4
             },
             .trigger_map = {
-                .mode         = 0,    // off
-                .zr_threshold = 101,  // off — never fire digital ZR in this mode
-                .zl_threshold = 101,  // off
-                .deadzone     = 0,
-                .invert_y     = false
+                .mode                         = 0,    // off
+                .zr_threshold                 = 101,  // off — never fire digital ZR in this mode
+                .zl_threshold                 = 101,  // off
+                .stick_y_to_buttons_threshold = 101,  // off
+                .deadzone                     = 0,
+                .invert_y                     = false
             }
         };
 
@@ -138,6 +139,12 @@ namespace ams::mitm {
                     } else {
                         ParseInt(value, &config->trigger_map.zl_threshold, 0, 100);
                     }
+                } else if (strcasecmp(name, "stick_y_to_buttons_threshold") == 0) {
+                    if (strcasecmp(value, "off") == 0) {
+                        config->trigger_map.stick_y_to_buttons_threshold = 101;
+                    } else {
+                        ParseInt(value, &config->trigger_map.stick_y_to_buttons_threshold, 0, 100);
+                    }
                 } else if (strcasecmp(name, "deadzone") == 0) {
                     ParseInt(value, &config->trigger_map.deadzone, 0, 100);
                 } else if (strcasecmp(name, "invert_y") == 0) {
@@ -177,11 +184,12 @@ namespace ams::mitm {
         ReadSystemLanguage();
 
         controller::TriggerProfile profile;
-        profile.mode         = static_cast<controller::TriggerMode>(g_global_config.trigger_map.mode);
-        profile.zr_threshold = static_cast<u8>(g_global_config.trigger_map.zr_threshold);
-        profile.zl_threshold = static_cast<u8>(g_global_config.trigger_map.zl_threshold);
-        profile.deadzone     = static_cast<u8>(g_global_config.trigger_map.deadzone);
-        profile.invert_y     = g_global_config.trigger_map.invert_y;
+        profile.mode                         = static_cast<controller::TriggerMode>(g_global_config.trigger_map.mode);
+        profile.zr_threshold                 = static_cast<u8>(g_global_config.trigger_map.zr_threshold);
+        profile.zl_threshold                 = static_cast<u8>(g_global_config.trigger_map.zl_threshold);
+        profile.stick_y_to_buttons_threshold = static_cast<u8>(g_global_config.trigger_map.stick_y_to_buttons_threshold);
+        profile.deadzone                     = static_cast<u8>(g_global_config.trigger_map.deadzone);
+        profile.invert_y                     = g_global_config.trigger_map.invert_y;
         controller::TriggerMapper::Instance().Initialize(profile);
         controller::TriggerMapper::Instance().LoadDirectoryProfiles();
     }
