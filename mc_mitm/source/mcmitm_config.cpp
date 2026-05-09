@@ -183,6 +183,7 @@ namespace ams::mitm {
         profile.deadzone     = static_cast<u8>(g_global_config.trigger_map.deadzone);
         profile.invert_y     = g_global_config.trigger_map.invert_y;
         controller::TriggerMapper::Instance().Initialize(profile);
+        controller::TriggerMapper::Instance().LoadDirectoryProfiles();
     }
 
     MissionControlConfig *GetGlobalConfig() {

@@ -15,18 +15,21 @@
  */
 #include "trigger_mapper.hpp"
 #include "switch_analog_stick.hpp"
+#include "../mcmitm_process_monitor.hpp"
+#include <stratosphere.hpp>
 #include <algorithm>
+#include <cstring>
 
 namespace ams::controller {
 
     namespace {
 
-        // Normalize raw 0..0xFFFF trigger into 0..1 after deadzone is applied.
-        // Returns 0 when raw <= deadzone_floor; otherwise rescales the remaining
-        // travel back to 0..1 so the deadzone doesn't compress the active range.
+        constexpr const char ControllersDir[] = "sdmc:/config/MissionControl/controllers";
+        constexpr const char TitlesDir[]      = "sdmc:/config/MissionControl/titles";
+
         float NormalizeWithDeadzone(u16 raw, u8 deadzone_pct) {
-            const float v       = raw / static_cast<float>(0xFFFF);
-            const float dz      = std::min(deadzone_pct, u8(99)) / 100.0f;
+            const float v  = raw / static_cast<float>(0xFFFF);
+            const float dz = std::min(deadzone_pct, u8(99)) / 100.0f;
             if (v <= dz) {
                 return 0.0f;
             }
@@ -34,10 +37,119 @@ namespace ams::controller {
         }
 
         u16 DeflectionToY12Bit(float deflection /* in [-1, +1] */) {
-            constexpr int Center   = SwitchAnalogStick::Center;             // 0x800
-            constexpr int HalfSpan = SwitchAnalogStick::Max - Center;       // 0x7FF
+            constexpr int Center   = SwitchAnalogStick::Center;
+            constexpr int HalfSpan = SwitchAnalogStick::Max - Center;
             const int y = Center + static_cast<int>(deflection * HalfSpan);
             return static_cast<u16>(std::clamp(y, int(SwitchAnalogStick::Min), int(SwitchAnalogStick::Max)));
+        }
+
+        int ProfileIniHandler(void *user, const char *section, const char *name, const char *value) {
+            if (strcasecmp(section, "trigger_map") != 0) {
+                return 1;  // ignore other sections, don't fail the parse
+            }
+            auto *p = reinterpret_cast<TriggerProfile *>(user);
+
+            auto parse_threshold_or_off = [&](u8 *out) {
+                if (strcasecmp(value, "off") == 0) {
+                    *out = 101;
+                } else {
+                    int tmp = std::strtol(value, nullptr, 10);
+                    if (tmp >= 0 && tmp <= 100) {
+                        *out = static_cast<u8>(tmp);
+                    }
+                }
+            };
+
+            if (strcasecmp(name, "mode") == 0) {
+                if (strcasecmp(value, "off") == 0) {
+                    p->mode = TriggerMode::Off;
+                } else if (strcasecmp(value, "rstick_y_split") == 0) {
+                    p->mode = TriggerMode::RstickYSplit;
+                }
+            } else if (strcasecmp(name, "zr_threshold") == 0) {
+                parse_threshold_or_off(&p->zr_threshold);
+            } else if (strcasecmp(name, "zl_threshold") == 0) {
+                parse_threshold_or_off(&p->zl_threshold);
+            } else if (strcasecmp(name, "deadzone") == 0) {
+                int tmp = std::strtol(value, nullptr, 10);
+                if (tmp >= 0 && tmp <= 100) {
+                    p->deadzone = static_cast<u8>(tmp);
+                }
+            } else if (strcasecmp(name, "invert_y") == 0) {
+                if (strcasecmp(value, "true") == 0)  p->invert_y = true;
+                if (strcasecmp(value, "false") == 0) p->invert_y = false;
+            }
+            return 1;
+        }
+
+        bool ParseProfileFile(const char *path, TriggerProfile *out) {
+            fs::FileHandle file;
+            if (R_FAILED(fs::OpenFile(std::addressof(file), path, fs::OpenMode_Read))) {
+                return false;
+            }
+            ON_SCOPE_EXIT { fs::CloseFile(file); };
+            return R_SUCCEEDED(util::ini::ParseFile(file, out, ProfileIniHandler));
+        }
+
+        // Filename without ".ini" suffix → e.g. "aabbccddeeff" or "0100b00021c70000".
+        // Returns false if the filename doesn't end in .ini or the stem doesn't match
+        // the expected hex length.
+        bool StripIniExtension(const char *name, char *stem_out, size_t stem_capacity, size_t expected_len) {
+            const size_t name_len = std::strlen(name);
+            constexpr size_t suffix_len = 4;  // ".ini"
+            if (name_len < suffix_len + expected_len) return false;
+            if (strcasecmp(name + name_len - suffix_len, ".ini") != 0) return false;
+            const size_t stem_len = name_len - suffix_len;
+            if (stem_len != expected_len) return false;
+            if (stem_len + 1 > stem_capacity) return false;
+            std::memcpy(stem_out, name, stem_len);
+            stem_out[stem_len] = '\0';
+            return true;
+        }
+
+        bool ParseHexMac(const char *stem, bluetooth::Address *out) {
+            // Expected: 12 lowercase hex chars (matches GetControllerDirectory format).
+            char pair[3] = {};
+            for (size_t i = 0; i < sizeof(out->address); ++i) {
+                pair[0] = stem[i*2];
+                pair[1] = stem[i*2 + 1];
+                char *endp = nullptr;
+                unsigned long byte = std::strtoul(pair, &endp, 16);
+                if (endp != pair + 2) return false;
+                out->address[i] = static_cast<u8>(byte);
+            }
+            return true;
+        }
+
+        bool ParseHexU64(const char *stem, u64 *out) {
+            char *endp = nullptr;
+            *out = std::strtoull(stem, &endp, 16);
+            return endp == stem + 16;
+        }
+
+        // Iterate `dir_path` and call `on_each(stem)` for every file matching `*.ini`
+        // with a stem of length `stem_len`. Silently no-ops if the directory can't be
+        // opened.
+        template<typename F>
+        void ForEachIniFile(const char *dir_path, size_t stem_len, F&& on_each) {
+            fs::DirectoryHandle dir;
+            if (R_FAILED(fs::OpenDirectory(std::addressof(dir), dir_path, fs::OpenDirectoryMode_File))) {
+                return;
+            }
+            ON_SCOPE_EXIT { fs::CloseDirectory(dir); };
+
+            // ReadDirectory one-at-a-time so we don't blow the stack on a large entry.
+            fs::DirectoryEntry entry;
+            s64 read_count = 0;
+            while (R_SUCCEEDED(fs::ReadDirectory(&read_count, &entry, dir, 1)) && read_count > 0) {
+                if (entry.type != fs::DirectoryEntryType_File) continue;
+                char stem[64];
+                if (!StripIniExtension(entry.name, stem, sizeof(stem), stem_len)) continue;
+
+                char full_path[fs::EntryNameLengthMax + 64];
+                util::SNPrintf(full_path, sizeof(full_path), "%s/%s", dir_path, entry.name);
+                on_each(stem, full_path);
+            }
         }
 
         constinit TriggerMapper g_mapper;
@@ -52,12 +164,50 @@ namespace ams::controller {
         m_global = global_profile;
     }
 
-    void TriggerMapper::Apply(SwitchButtonData& buttons,
+    void TriggerMapper::LoadDirectoryProfiles() {
+        ForEachIniFile(ControllersDir, 12 /* hex chars in a MAC */,
+            [this](const char *stem, const char *full_path) {
+                bluetooth::Address addr;
+                if (!ParseHexMac(stem, &addr)) return;
+                TriggerProfile profile = m_global;  // start from global, then override
+                if (!ParseProfileFile(full_path, &profile)) return;
+                m_controllers.push_back({addr, profile});
+            });
+
+        ForEachIniFile(TitlesDir, 16 /* hex chars in a Switch programID */,
+            [this](const char *stem, const char *full_path) {
+                u64 title_id;
+                if (!ParseHexU64(stem, &title_id)) return;
+                TriggerProfile profile = m_global;
+                if (!ParseProfileFile(full_path, &profile)) return;
+                m_titles.push_back({title_id, profile});
+            });
+    }
+
+    const TriggerProfile& TriggerMapper::Resolve(const bluetooth::Address& addr) const {
+        const u64 current_title = mc::GetCurrentProgramId().value;
+        if (current_title != 0) {
+            for (const auto& t : m_titles) {
+                if (t.title_id == current_title) {
+                    return t.profile;
+                }
+            }
+        }
+        for (const auto& c : m_controllers) {
+            if (std::memcmp(&c.addr, &addr, sizeof(addr)) == 0) {
+                return c.profile;
+            }
+        }
+        return m_global;
+    }
+
+    void TriggerMapper::Apply(const bluetooth::Address& addr,
+                              SwitchButtonData& buttons,
                               SwitchAnalogStick& /* lstick */,
                               SwitchAnalogStick& rstick,
                               u16 left_trigger_norm,
                               u16 right_trigger_norm) {
-        const TriggerProfile& p = m_global;
+        const TriggerProfile& p = this->Resolve(addr);
         if (p.mode == TriggerMode::Off) {
             return;
         }
@@ -67,13 +217,12 @@ namespace ams::controller {
 
         switch (p.mode) {
             case TriggerMode::RstickYSplit: {
-                float deflection = rt - lt;                                  // [-1, +1]
+                float deflection = rt - lt;
                 if (p.invert_y) {
                     deflection = -deflection;
                 }
                 rstick.SetY(DeflectionToY12Bit(deflection));
 
-                // Override ZL/ZR — only fire after the configured threshold of trigger travel.
                 buttons.ZR = (rt * 100.0f) >= p.zr_threshold ? 1 : 0;
                 buttons.ZL = (lt * 100.0f) >= p.zl_threshold ? 1 : 0;
                 break;

@@ -15,6 +15,7 @@
  */
 #pragma once
 #include "switch_controller.hpp"
+#include <vector>
 
 namespace ams::controller {
 
@@ -45,18 +46,38 @@ namespace ams::controller {
         public:
             static TriggerMapper& Instance();
 
+            // Set the global default profile (from the [trigger_map] section of
+            // missioncontrol.ini). Always called once at boot.
             void Initialize(const TriggerProfile& global_profile);
 
-            // Apply the active profile to the per-packet controller state.
-            // No-op when the resolved profile's mode == Off (the hot-path common case).
-            void Apply(SwitchButtonData& buttons,
+            // Scan sdmc:/config/MissionControl/{controllers,titles}/ for per-MAC
+            // and per-titleID overrides. Each filename is expected to be the key
+            // (12-hex MAC for controllers/, 16-hex programID for titles/) with an
+            // .ini extension; each file's [trigger_map] section is parsed into a
+            // complete TriggerProfile. Called once at boot, after Initialize.
+            void LoadDirectoryProfiles();
+
+            // Apply the controller's currently-resolved profile to the per-packet
+            // controller state. No-op when the resolved profile's mode == Off.
+            void Apply(const bluetooth::Address& addr,
+                       SwitchButtonData& buttons,
                        SwitchAnalogStick& lstick,
                        SwitchAnalogStick& rstick,
                        u16 left_trigger_norm,
                        u16 right_trigger_norm);
 
         private:
-            TriggerProfile m_global;
+            // Resolve the active profile for this controller given the currently-running
+            // title. Precedence: per-title > per-controller > global. Profile-level —
+            // whichever level matches first is returned in full, no field merging.
+            const TriggerProfile& Resolve(const bluetooth::Address& addr) const;
+
+            struct ControllerEntry { bluetooth::Address addr;     TriggerProfile profile; };
+            struct TitleEntry      { u64                title_id; TriggerProfile profile; };
+
+            TriggerProfile               m_global;
+            std::vector<ControllerEntry> m_controllers;
+            std::vector<TitleEntry>      m_titles;
     };
 
 }
