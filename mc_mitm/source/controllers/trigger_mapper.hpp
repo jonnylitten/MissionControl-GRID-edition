@@ -34,6 +34,11 @@ namespace ams::controller {
         u8          zl_threshold = 101;  // off
         u8          deadzone     = 0;    // 0..100, on raw trigger
         bool        invert_y     = false;
+        // In rstick_y_split mode the trigger overwrites the right-stick Y axis,
+        // freeing the physical stick's up/down for repurposing as digital ZR/ZL.
+        // 0..100 = stick-deflection percent threshold; > 100 = feature off.
+        // Physical stick up past the threshold fires ZR; down fires ZL.
+        u8          stick_y_to_buttons_threshold = 101;  // off
     };
 
     // Scale any unsigned-integer trigger value into a normalized 0..0xFFFF range.
