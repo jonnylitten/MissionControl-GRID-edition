@@ -20,9 +20,11 @@ It exists for one specific kind of pain: games like **Grid Autosport** and **Sup
 
 1. Grab the latest `.zip` from [Releases](../../releases) and merge its contents onto your SD card (overwrites the MissionControl files under `/atmosphere/contents/010000000000bd00/`).
 2. Reboot.
-3. (Optional) Edit `sdmc:/config/MissionControl/missioncontrol.ini` — see below.
+3. **Launch Grid Autosport — it just works.** The release ships a per-title profile for Grid (`sdmc:/config/MissionControl/titles/0100dc800a602000.ini`), so analog throttle/brake on the right-stick Y is enabled out of the box. Every other game falls through to stock MissionControl behaviour.
 
 If you've never installed MissionControl before, follow the upstream install guide in [README-upstream.md](README-upstream.md) — this fork installs identically.
+
+To add the feature for other games, drop more files under `sdmc:/config/MissionControl/titles/` — see [Configure](#configure) below for the schema and [`presets/titles/`](presets/titles/) for the bundled Grid example.
 
 ## Configure
 

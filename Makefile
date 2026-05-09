@@ -46,6 +46,8 @@ dist: all
 	mkdir -p dist/config/MissionControl/titles
 	cp mc_mitm/config.ini dist/config/MissionControl/missioncontrol.ini.template
 
+	cp presets/titles/*.ini dist/config/MissionControl/titles/
+
 	cd dist; zip -r $(PROJECT_NAME)-$(BUILD_VERSION).zip ./*; cd ../;
 
 .PHONY: all clean dist $(TARGETS)
