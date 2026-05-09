@@ -38,6 +38,14 @@ namespace ams::mitm {
             bool dualsense_enable_player_leds;
             int dualsense_vibration_intensity;
         } misc;
+
+        struct {
+            int  mode;          // 0=off, 1=rstick_y_split
+            int  zr_threshold;  // 0..100
+            int  zl_threshold;  // 0..100
+            int  deadzone;      // 0..100
+            bool invert_y;
+        } trigger_map;
     };
 
     void LoadConfiguration();

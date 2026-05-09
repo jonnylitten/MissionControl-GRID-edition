@@ -15,6 +15,7 @@
  */
 #include <stratosphere.hpp>
 #include "mcmitm_config.hpp"
+#include "controllers/trigger_mapper.hpp"
 
 namespace ams::mitm {
 
@@ -38,6 +39,13 @@ namespace ams::mitm {
                 .dualsense_lightbar_brightness = 5,
                 .dualsense_enable_player_leds = true,
                 .dualsense_vibration_intensity = 4
+            },
+            .trigger_map = {
+                .mode         = 0,    // off
+                .zr_threshold = 101,  // off — never fire digital ZR in this mode
+                .zl_threshold = 101,  // off
+                .deadzone     = 0,
+                .invert_y     = false
             }
         };
 
@@ -111,6 +119,30 @@ namespace ams::mitm {
                 } else if (strcasecmp(name, "dualsense_vibration_intensity") == 0) {
                     ParseInt(value, &config->misc.dualsense_vibration_intensity, 1, 8);
                 }
+            } else if (strcasecmp(section, "trigger_map") == 0) {
+                if (strcasecmp(name, "mode") == 0) {
+                    if (strcasecmp(value, "off") == 0) {
+                        config->trigger_map.mode = 0;
+                    } else if (strcasecmp(value, "rstick_y_split") == 0) {
+                        config->trigger_map.mode = 1;
+                    }
+                } else if (strcasecmp(name, "zr_threshold") == 0) {
+                    if (strcasecmp(value, "off") == 0) {
+                        config->trigger_map.zr_threshold = 101;
+                    } else {
+                        ParseInt(value, &config->trigger_map.zr_threshold, 0, 100);
+                    }
+                } else if (strcasecmp(name, "zl_threshold") == 0) {
+                    if (strcasecmp(value, "off") == 0) {
+                        config->trigger_map.zl_threshold = 101;
+                    } else {
+                        ParseInt(value, &config->trigger_map.zl_threshold, 0, 100);
+                    }
+                } else if (strcasecmp(name, "deadzone") == 0) {
+                    ParseInt(value, &config->trigger_map.deadzone, 0, 100);
+                } else if (strcasecmp(name, "invert_y") == 0) {
+                    ParseBoolean(value, &config->trigger_map.invert_y);
+                }
             } else {
                 return 0;
             }
@@ -143,6 +175,14 @@ namespace ams::mitm {
     void LoadConfiguration() {
         ParseIniConfiguration();
         ReadSystemLanguage();
+
+        controller::TriggerProfile profile;
+        profile.mode         = static_cast<controller::TriggerMode>(g_global_config.trigger_map.mode);
+        profile.zr_threshold = static_cast<u8>(g_global_config.trigger_map.zr_threshold);
+        profile.zl_threshold = static_cast<u8>(g_global_config.trigger_map.zl_threshold);
+        profile.deadzone     = static_cast<u8>(g_global_config.trigger_map.deadzone);
+        profile.invert_y     = g_global_config.trigger_map.invert_y;
+        controller::TriggerMapper::Instance().Initialize(profile);
     }
 
     MissionControlConfig *GetGlobalConfig() {

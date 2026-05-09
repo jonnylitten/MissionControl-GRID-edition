@@ -78,6 +78,15 @@ namespace ams::controller {
             SwitchButtonData m_buttons;
             SwitchAnalogStick m_left_stick;
             SwitchAnalogStick m_right_stick;
+            // Raw analog trigger values normalized to u16 (0..0xFFFF), populated by
+            // per-controller subclasses that opt into the trigger-mapper post-hook.
+            u16 m_left_trigger_raw  = 0;
+            u16 m_right_trigger_raw = 0;
+            // Subclass sets this to true to participate in the trigger→stick mapper.
+            // Stays false for controllers without analog triggers, which would
+            // otherwise have their right-stick Y pinned to center when a mapping
+            // mode is active globally.
+            bool m_supports_trigger_map = false;
             Vec3d<float> m_accel;
             Vec3d<float> m_gyro;
 
