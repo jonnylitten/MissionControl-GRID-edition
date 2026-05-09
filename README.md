@@ -74,6 +74,10 @@ The whole feature is contained in:
 
 GPL-2.0, same as upstream MissionControl. See `LICENSE`.
 
+## Disclaimer
+
+Custom-firmware sysmodules like this can put your Switch in a bad state if misused. Use at your own risk. Not affiliated with Nintendo, the Atmosphère project, or upstream MissionControl. Distributed under GPL-2.0 (see [LICENSE](LICENSE)) — no warranty, express or implied.
+
 ## Credits
 
 All of MissionControl's heavy lifting is **ndeadly's** — this fork is a thin feature on top. The trigger→stick idea originated in [ndeadly/MissionControl#1006](https://github.com/ndeadly/MissionControl/issues/1006) as a proof-of-concept patch; this fork makes it configurable per-game and per-controller, and adds the "stick Y → digital ZR/ZL" repurposing.
