@@ -14,6 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "emulated_switch_controller.hpp"
+#include "trigger_mapper.hpp"
 #include "../utils.hpp"
 #include "../mcmitm_config.hpp"
 
@@ -60,6 +61,8 @@ namespace ams::controller {
         std::memset(&m_buttons, 0, sizeof(m_buttons));
         m_left_stick.SetData(SwitchAnalogStick::Center, SwitchAnalogStick::Center);
         m_right_stick.SetData(SwitchAnalogStick::Center, SwitchAnalogStick::Center);
+        m_left_trigger_raw = 0;
+        m_right_trigger_raw = 0;
         std::memset(&m_accel, 0, sizeof(m_accel));
         std::memset(&m_gyro, 0, sizeof(m_gyro));
         m_motion_packer->SetGyroSensitivity(GyroSensitivity_2000Dps);
@@ -68,6 +71,11 @@ namespace ams::controller {
 
     void EmulatedSwitchController::UpdateControllerState(const bluetooth::HidReport *report) {
         this->ProcessInputData(report);
+
+        if (m_supports_trigger_map) {
+            TriggerMapper::Instance().Apply(m_buttons, m_left_stick, m_right_stick,
+                                            m_left_trigger_raw, m_right_trigger_raw);
+        }
 
         auto input_report = reinterpret_cast<SwitchInputReport *>(m_input_report.data);
         input_report->id = m_input_report_mode;

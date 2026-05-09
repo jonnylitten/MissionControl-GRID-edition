@@ -14,6 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "dualshock4_controller.hpp"
+#include "trigger_mapper.hpp"
 #include "../mcmitm_config.hpp"
 #include <switch.h>
 #include <stratosphere.hpp>
@@ -51,6 +52,7 @@ namespace ams::controller {
         auto config = mitm::GetGlobalConfig();
         m_report_rate = static_cast<Dualshock4ReportRate>(config->misc.dualshock4_polling_rate);
         m_lightbar_brightness = config->misc.dualshock4_lightbar_brightness;
+        m_supports_trigger_map = true;
 
         R_TRY(this->PushRumbleLedState());
         R_TRY(EmulatedSwitchController::Initialize());
@@ -116,6 +118,9 @@ namespace ams::controller {
 
         m_buttons.ZR = src->input0x01.right_trigger > (m_trigger_threshold * TriggerMax);
         m_buttons.ZL = src->input0x01.left_trigger  > (m_trigger_threshold * TriggerMax);
+
+        m_left_trigger_raw  = NormalizeTriggerU8(src->input0x01.left_trigger);
+        m_right_trigger_raw = NormalizeTriggerU8(src->input0x01.right_trigger);
     }
 
     void Dualshock4Controller::MapInputReport0x11(const Dualshock4ReportData *src) {
@@ -144,6 +149,9 @@ namespace ams::controller {
 
         m_buttons.ZR = src->input0x11.right_trigger > (m_trigger_threshold * TriggerMax);
         m_buttons.ZL = src->input0x11.left_trigger  > (m_trigger_threshold * TriggerMax);
+
+        m_left_trigger_raw  = NormalizeTriggerU8(src->input0x11.left_trigger);
+        m_right_trigger_raw = NormalizeTriggerU8(src->input0x11.right_trigger);
 
         if (src->input0x11.buttons.touchpad) {
             for (int i = 0; i < src->input0x11.num_reports; ++i) {
