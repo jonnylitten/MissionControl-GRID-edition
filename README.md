@@ -2,7 +2,7 @@
 
 A fork of [ndeadly/MissionControl](https://github.com/ndeadly/MissionControl) that adds **configurable analog-trigger → stick remapping** for Bluetooth controllers on Nintendo Switch.
 
-It exists for one specific kind of pain: games like **Grid Autosport** and **Super Mario Sunshine** read throttle / brake / FLUDD pressure off the right-stick analog Y axis, but third-party Bluetooth controllers don't natively expose their triggers as a stick. With this fork you can tell MissionControl "for *this* game, treat RT/LT as right-stick up/down" and the game just works.
+It exists for one specific kind of pain: games like **Grid Autosport** throttle / brake pressure off the right-stick analog Y axis, but third-party Bluetooth controllers don't natively expose their triggers as a stick. With this fork you can tell MissionControl "for *this* game, treat RT/LT as right-stick up/down" and the game just works.
 
 ## What's added
 
