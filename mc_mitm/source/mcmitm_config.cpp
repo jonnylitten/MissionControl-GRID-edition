@@ -192,6 +192,7 @@ namespace ams::mitm {
         profile.invert_y                     = g_global_config.trigger_map.invert_y;
         controller::TriggerMapper::Instance().Initialize(profile);
         controller::TriggerMapper::Instance().LoadDirectoryProfiles();
+        controller::TriggerMapper::Instance().StartHotReloadThread();
     }
 
     MissionControlConfig *GetGlobalConfig() {
