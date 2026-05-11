@@ -15,6 +15,7 @@
  */
 #pragma once
 #include "switch_controller.hpp"
+#include <mutex>
 #include <vector>
 
 namespace ams::controller {
@@ -59,7 +60,9 @@ namespace ams::controller {
             // and per-titleID overrides. Each filename is expected to be the key
             // (12-hex MAC for controllers/, 16-hex programID for titles/) with an
             // .ini extension; each file's [trigger_map] section is parsed into a
-            // complete TriggerProfile. Called once at boot, after Initialize.
+            // complete TriggerProfile. Called once at boot, after Initialize, and
+            // automatically re-run on every title switch so newly-added ini files
+            // take effect without requiring a sysmodule restart.
             void LoadDirectoryProfiles();
 
             // Apply the controller's currently-resolved profile to the per-packet
@@ -72,14 +75,21 @@ namespace ams::controller {
                        u16 right_trigger_norm);
 
         private:
-            // Resolve the active profile for this controller given the currently-running
-            // title. Precedence: per-title > per-controller > global. Profile-level —
-            // whichever level matches first is returned in full, no field merging.
-            const TriggerProfile& Resolve(const bluetooth::Address& addr) const;
+            // Resolve the active profile for this controller given a specific title.
+            // Precedence: per-title > per-controller > global. Profile-level — whichever
+            // level matches first is returned in full, no field merging.
+            const TriggerProfile& Resolve(const bluetooth::Address& addr, u64 current_title) const;
+
+            // LoadDirectoryProfiles without taking m_mutex; caller must hold it.
+            void LoadDirectoryProfilesUnsafe();
 
             struct ControllerEntry { bluetooth::Address addr;     TriggerProfile profile; };
             struct TitleEntry      { u64                title_id; TriggerProfile profile; };
 
+            mutable std::mutex           m_mutex;
+            // Sentinel u64(-1) ensures the first Apply() observes a title change and
+            // doesn't re-scan unnecessarily.
+            u64                          m_last_seen_title = static_cast<u64>(-1);
             TriggerProfile               m_global;
             std::vector<ControllerEntry> m_controllers;
             std::vector<TitleEntry>      m_titles;

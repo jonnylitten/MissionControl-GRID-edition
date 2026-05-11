@@ -167,6 +167,14 @@ namespace ams::controller {
     }
 
     void TriggerMapper::LoadDirectoryProfiles() {
+        std::scoped_lock lk(m_mutex);
+        this->LoadDirectoryProfilesUnsafe();
+    }
+
+    void TriggerMapper::LoadDirectoryProfilesUnsafe() {
+        m_controllers.clear();
+        m_titles.clear();
+
         ForEachIniFile(ControllersDir, 12 /* hex chars in a MAC */,
             [this](const char *stem, const char *full_path) {
                 bluetooth::Address addr;
@@ -186,8 +194,7 @@ namespace ams::controller {
             });
     }
 
-    const TriggerProfile& TriggerMapper::Resolve(const bluetooth::Address& addr) const {
-        const u64 current_title = mc::GetCurrentProgramId().value;
+    const TriggerProfile& TriggerMapper::Resolve(const bluetooth::Address& addr, u64 current_title) const {
         if (current_title != 0) {
             for (const auto& t : m_titles) {
                 if (t.title_id == current_title) {
@@ -209,7 +216,20 @@ namespace ams::controller {
                               SwitchAnalogStick& rstick,
                               u16 left_trigger_norm,
                               u16 right_trigger_norm) {
-        const TriggerProfile& p = this->Resolve(addr);
+        std::scoped_lock lk(m_mutex);
+
+        // Hot-reload: on each title switch, re-scan the per-title and per-controller
+        // directories so newly-added ini files take effect without a sysmodule restart.
+        // The rescan only fires when the current title actually differs from the last
+        // one we observed — typical cost is one fs::OpenDirectory + a few file reads,
+        // which is dominated by the title-switch transition itself.
+        const u64 current_title = mc::GetCurrentProgramId().value;
+        if (current_title != m_last_seen_title) {
+            m_last_seen_title = current_title;
+            this->LoadDirectoryProfilesUnsafe();
+        }
+
+        const TriggerProfile& p = this->Resolve(addr, current_title);
         if (p.mode == TriggerMode::Off) {
             return;
         }
