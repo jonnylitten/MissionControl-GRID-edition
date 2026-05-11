@@ -26,6 +26,7 @@ Use controllers from other consoles natively on your Nintendo Switch via Bluetoo
 * Enables use of [JoyConDroid](https://github.com/TeamJCD/JoyConDroid) without root access.
 * Spoofing of host Bluetooth adapter name and address.
 * `mc.mitm` module adds extension IPC commands that can be used to interact with the `bluetooth` process without interfering with the state of the system.
+* Configurable mapping of analog triggers onto the right-stick Y axis, with per-game and per-controller overrides — useful for games that read throttle/brake from the stick rather than ZR/ZL (e.g. Grid Autosport).
 
 ### Supported Controllers
 
@@ -156,6 +157,16 @@ These are miscellaneous controller-specific settings etc.
     - `dualsense_lightbar_brightness` Set LED lightbar brightness for Sony Dualsense controllers. Valid range [0-9] where 0=off, 1=min, 2-9=12.5-100% in 12.5% increments.
     - `dualsense_enable_player_leds` Enable/disable the white player indicator LEDs below the Dualsense touchpad.
     - `dualsense_vibration_intensity` Set Dualsense vibration intensity, 12.5% per increment. Valid range [1-8] where 1=12.5%, 8=100%.
+
+- `[trigger_map]`
+Configurable mapping of analog triggers onto stick axes, for games that read throttle/brake from the right-stick Y rather than ZR/ZL. Default `mode=off` is a no-op; per-controller subclasses individually opt into the feature.
+    - `mode` Active mapping. Valid values: `off`, `rstick_y_split` (RT → +Y, LT → -Y on right stick).
+    - `zr_threshold` / `zl_threshold` Trigger-percent threshold above which the digital ZR/ZL bit fires while a mapping is active. Range [0-100] or `off` (default — usually you want the trigger to be analog-only in this mode).
+    - `stick_y_to_buttons_threshold` In `rstick_y_split`, fires ZR (up) / ZL (down) when the physical stick Y is deflected past N%. Range [0-100] or `off` (default).
+    - `deadzone` Deadzone on the raw trigger before activation. Range [0-100].
+    - `invert_y` Flip trigger-to-stick direction (RT → -Y, LT → +Y).
+
+These settings form the global default. Per-game overrides go in `/config/MissionControl/titles/<16-hex-program-id>.ini` (e.g. `0100dc800a602000.ini`); per-controller overrides in `/config/MissionControl/controllers/<lowercase-MAC>.ini`. Each override file is parsed as a complete `[trigger_map]` profile (fields are not merged with the global). Precedence: per-title > per-controller > global. Override directories are re-scanned on every title switch — adding a game profile takes effect on next launch without a sysmodule restart.
 
 ### Removal
 
