@@ -15,6 +15,7 @@
  */
 #pragma once
 #include "switch_controller.hpp"
+#include <stratosphere.hpp>
 #include <vector>
 
 namespace ams::controller {
@@ -59,11 +60,20 @@ namespace ams::controller {
             // and per-titleID overrides. Each filename is expected to be the key
             // (12-hex MAC for controllers/, 16-hex programID for titles/) with an
             // .ini extension; each file's [trigger_map] section is parsed into a
-            // complete TriggerProfile. Called once at boot, after Initialize.
+            // complete TriggerProfile. Called once at boot from LoadConfiguration,
+            // and again from the hot-reload thread on every title switch.
             void LoadDirectoryProfiles();
+
+            // Launch the background thread that waits on the existing process-switch
+            // event and re-runs LoadDirectoryProfiles on each title transition, so
+            // newly-added ini files take effect without a sysmodule restart.
+            // No-ops on second call. The thread runs for the lifetime of the sysmodule.
+            void StartHotReloadThread();
 
             // Apply the controller's currently-resolved profile to the per-packet
             // controller state. No-op when the resolved profile's mode == Off.
+            // Called from the bluetooth input thread; takes m_mutex but never performs
+            // filesystem I/O on this path.
             void Apply(const bluetooth::Address& addr,
                        SwitchButtonData& buttons,
                        SwitchAnalogStick& lstick,
@@ -72,14 +82,18 @@ namespace ams::controller {
                        u16 right_trigger_norm);
 
         private:
-            // Resolve the active profile for this controller given the currently-running
-            // title. Precedence: per-title > per-controller > global. Profile-level —
-            // whichever level matches first is returned in full, no field merging.
-            const TriggerProfile& Resolve(const bluetooth::Address& addr) const;
+            // Resolve the active profile for this controller given a specific title.
+            // Precedence: per-title > per-controller > global. Profile-level — whichever
+            // level matches first is returned in full, no field merging.
+            const TriggerProfile& Resolve(const bluetooth::Address& addr, u64 current_title) const;
+
+            // LoadDirectoryProfiles without taking m_mutex; caller must hold it.
+            void LoadDirectoryProfilesUnsafe();
 
             struct ControllerEntry { bluetooth::Address addr;     TriggerProfile profile; };
             struct TitleEntry      { u64                title_id; TriggerProfile profile; };
 
+            os::SdkMutex                 m_mutex;
             TriggerProfile               m_global;
             std::vector<ControllerEntry> m_controllers;
             std::vector<TitleEntry>      m_titles;
